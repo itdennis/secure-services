@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 
 namespace StatlerWaldorfCorp.Secureservice
 {
@@ -25,7 +26,30 @@ namespace StatlerWaldorfCorp.Secureservice
             services.AddMvc();
             services.AddOptions();
 
-            services.AddAuthorization( options => {
+            services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            }).AddJwtBearer(configureOptions =>
+            {
+                string SecretKey = "seriouslyneverleavethissittinginyourcode";
+                SymmetricSecurityKey signingKey =  new SymmetricSecurityKey(Encoding.ASCII.GetBytes(SecretKey));
+                configureOptions.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuer = false,
+                    ValidIssuer = "https://fake.issuer.com",
+
+                    ValidateAudience = false,
+                    ValidAudience = "https://sampleservice.example.com",
+
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = signingKey,
+                    
+                    ValidateLifetime = true
+                };
+            });
+
+            services.AddAuthorization(options => {
                options.AddPolicy("CheeseburgerPolicy",
                         policy => policy.RequireClaim("icanhazcheeseburger", "true"));
             });
@@ -34,30 +58,8 @@ namespace StatlerWaldorfCorp.Secureservice
          public void Configure(IApplicationBuilder app, IHostingEnvironment env, 
                                 ILoggerFactory loggerFactory)
          {
-            string SecretKey = "seriouslyneverleavethissittinginyourcode";
-            SymmetricSecurityKey signingKey = 
-                new SymmetricSecurityKey(Encoding.ASCII.GetBytes(SecretKey));
-            
             loggerFactory.AddConsole(Configuration.GetSection("Logging"));
             loggerFactory.AddDebug();
-            
-            app.UseJwtBearerAuthentication(new JwtBearerOptions  
-            {
-                AutomaticAuthenticate = true,
-                AutomaticChallenge = true,
-                TokenValidationParameters = new TokenValidationParameters
-                {
-                    ValidateIssuerSigningKey = true,
-                    IssuerSigningKey = signingKey,
-                    ValidateIssuer = false,
-                    ValidIssuer = "https://fake.issuer.com",
-
-                    ValidateAudience = false,
-                    ValidAudience = "https://sampleservice.example.com",
-
-                    ValidateLifetime = true,                    
-                }
-            });
 
             app.UseMvc();
          }

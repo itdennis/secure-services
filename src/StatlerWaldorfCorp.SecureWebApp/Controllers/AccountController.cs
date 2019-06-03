@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Http.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using System.Linq;
 using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
 
 namespace StatlerWaldorfCorp.SecureWebApp.Controllers
 {

@@ -32,24 +32,30 @@ namespace StatlerWaldorfCorp.SecureWebApp
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            services.AddAuthentication(
-                options => options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme);
-            
             // Add framework services.
             services.AddMvc();
 
             services.AddOptions();
 
-            services.Configure<OpenIDSettings>(Configuration.GetSection("OpenID"));
+            var openIdConfiguration = Configuration.GetSection("OpenID");
+            services.Configure<OpenIDSettings>(openIdConfiguration);
+
+            var openIdSettings = openIdConfiguration.Get(typeof (OpenIDSettings)) as OpenIDSettings;
+            Console.WriteLine("Using OpenID Auth domain of : " + openIdSettings.Domain);
+            services.AddAuthentication(options => {
+                options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+            }).AddCookie()
+            .AddOpenIdConnect(options =>{
+                ConfigureOpenIdConnectOptions(options, openIdSettings);
+            });
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
         public void Configure(IApplicationBuilder app, IHostingEnvironment env, 
-                    ILoggerFactory loggerFactory,
-                    IOptions<OpenIDSettings> openIdSettings)
+                    ILoggerFactory loggerFactory)
         {
 
-            Console.WriteLine("Using OpenID Auth domain of : " + openIdSettings.Value.Domain);
             loggerFactory.AddConsole(Configuration.GetSection("Logging"));
             loggerFactory.AddDebug();
 
@@ -64,21 +70,6 @@ namespace StatlerWaldorfCorp.SecureWebApp
 
             app.UseStaticFiles();
 
-            app.UseCookieAuthentication( new CookieAuthenticationOptions
-            {
-                AutomaticAuthenticate = true,
-                AutomaticChallenge = true
-            });
-
-            var options = CreateOpenIdConnectOptions(openIdSettings);
-            options.Scope.Clear();
-            options.Scope.Add("openid");
-            options.Scope.Add("name");
-            options.Scope.Add("email");
-            options.Scope.Add("picture");
-
-            app.UseOpenIdConnectAuthentication(options);
-
             app.UseMvc(routes =>
             {
                 routes.MapRoute(
@@ -87,24 +78,24 @@ namespace StatlerWaldorfCorp.SecureWebApp
             });
         }
 
-        private OpenIdConnectOptions CreateOpenIdConnectOptions(
-            IOptions<OpenIDSettings> openIdSettings)
+        private void ConfigureOpenIdConnectOptions(OpenIdConnectOptions options, OpenIDSettings openIdSettings)
         {
-            return new OpenIdConnectOptions("Auth0")
-            {
-                Authority = $"https://{openIdSettings.Value.Domain}",
-                ClientId = openIdSettings.Value.ClientId,
-                ClientSecret = openIdSettings.Value.ClientSecret,
-                AutomaticAuthenticate = false,
-                AutomaticChallenge = false,
+            options.Authority = $"https://{openIdSettings.Domain}";
+            options.ClientId = openIdSettings.ClientId;
+            options.ClientSecret = openIdSettings.ClientSecret;
 
-                ResponseType = "code",
-                CallbackPath = new PathString("/signin-auth0"),
+            options.ResponseType = "code";
+            options.CallbackPath = new PathString("/signin-auth0");
 
-                ClaimsIssuer = "Auth0",
-                SaveTokens = true,
-                Events = CreateOpenIdConnectEvents()
-            };
+            options.ClaimsIssuer = "Auth0";
+            options.SaveTokens = true;
+            options.Events = CreateOpenIdConnectEvents();
+
+            options.Scope.Clear();
+            options.Scope.Add("openid");
+            options.Scope.Add("name");
+            options.Scope.Add("email");
+            options.Scope.Add("picture");   
         }
 
         private OpenIdConnectEvents CreateOpenIdConnectEvents()
